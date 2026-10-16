@@ -20,7 +20,9 @@ ROWS = (
 )
 
 
-def _crash_during_extraction(root: str, ready, release) -> None:
+def _crash_during_destination_load(root: str, ready, release) -> None:
+    from fsspec.implementations.local import LocalFileSystem
+
     destination = filesystem(
         bucket_url=f"file://{root}/landed", layout=LAYOUT
     )
@@ -37,12 +39,22 @@ def _crash_during_extraction(root: str, ready, release) -> None:
         parallelized=True,
     )
     def deals(cursor=dlt.sources.incremental("updatedAt")):
-        yield ROWS[0]
-        ready.set()
-        release.wait()
-        yield ROWS[1]
+        yield from ROWS
 
-    pipeline.run(deals, loader_file_format="parquet")
+    original_put_file = LocalFileSystem.put_file
+
+    def block_destination_upload(file_system, local_path, remote_path, **kwargs):
+        path = Path(remote_path).resolve()
+        if path.is_relative_to(Path(root, "landed").resolve()) and path.suffix == ".parquet":
+            ready.set()
+            release.wait(timeout=30)
+        return original_put_file(file_system, local_path, remote_path, **kwargs)
+
+    LocalFileSystem.put_file = block_destination_upload
+    try:
+        pipeline.run(deals, loader_file_format="parquet")
+    finally:
+        LocalFileSystem.put_file = original_put_file
 
 
 def _synthetic_item(spec):
@@ -66,17 +78,19 @@ def _synthetic_item(spec):
 
 
 class DltExecutionTests(unittest.TestCase):
-    def test_force_kill_restarts_from_last_committed_package(self):
+    def test_force_kill_during_destination_upload_resumes_pending_package(self):
         context = multiprocessing.get_context("spawn")
         with tempfile.TemporaryDirectory() as temporary_directory:
             ready = context.Event()
             release = context.Event()
             worker = context.Process(
-                target=_crash_during_extraction,
+                target=_crash_during_destination_load,
                 args=(temporary_directory, ready, release),
             )
             worker.start()
-            self.assertTrue(ready.wait(timeout=30), "worker did not reach extraction")
+            self.assertTrue(
+                ready.wait(timeout=30), "worker did not reach destination upload"
+            )
             os.kill(worker.pid, signal.SIGKILL)
             worker.join(timeout=10)
             self.assertEqual(worker.exitcode, -signal.SIGKILL)
@@ -115,7 +129,7 @@ class DltExecutionTests(unittest.TestCase):
             lock = threading.Lock()
             original_iterator = source_module._resource_iterator
 
-            def concurrent_iterator(spec, token, control):
+            def concurrent_iterator(spec, token, control, last_value=None):
                 barrier.wait()
                 with lock:
                     thread_names.add(threading.current_thread().name)

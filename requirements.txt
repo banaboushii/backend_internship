@@ -2,3 +2,5 @@ dlt[filesystem,parquet]>=1.15,<2
 requests>=2.31,<3
 urllib3>=1.26,<3
 clickhouse-connect>=0.8,<1
+boto3>=1.34,<2
+python-dotenv>=1,<2

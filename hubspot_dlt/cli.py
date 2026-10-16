@@ -6,12 +6,15 @@ import argparse
 import json
 import os
 
+from dotenv import load_dotenv
+
 from .clickhouse_loader import load_into_clickhouse
 from .pipeline import run_pipeline
 from .state import ControlStore
 
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(prog="hubspot-dlt")
     parser.add_argument(
         "command", choices=("run", "pause", "resume", "status", "load-clickhouse")
