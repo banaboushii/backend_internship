@@ -8,17 +8,30 @@ control database is for pause/resume and visible page progress.
 
 ## Setup
 
-Use Python 3.10 or newer, install `requirements.txt`, and provide:
+Use Python 3.10 or newer, install Docker Compose and Python requirements. Start
+the local MinIO and ClickHouse services:
 
 ```sh
-export HUBSPOT_ACCESS_TOKEN='...'
-export MINIO_ENDPOINT='http://localhost:9000'
-export MINIO_BUCKET='hubspot'
-export MINIO_PREFIX='hubspot'
-export MINIO_ACCESS_KEY='minioadmin'
-export MINIO_SECRET_KEY='minioadmin'
-export CLICKHOUSE_HOST='localhost'
+cp .env.example .env
 ```
+
+Set `HUBSPOT_ACCESS_TOKEN` in `.env` to a HubSpot private app token, then run:
+
+```sh
+docker compose up -d
+python -m pip install -r requirements.txt
+```
+
+The Compose stack creates the MinIO bucket automatically. MinIO's API and
+console are available at `http://localhost:9000` and `http://localhost:9001`;
+ClickHouse HTTP is at `http://localhost:8123`. The default MinIO credentials
+are for local development only; change them before exposing these services.
+Do not commit your `.env` file.
+
+Run the Python pipeline from the host as shown below. It connects to MinIO at
+`localhost:9000` and ClickHouse at `localhost:8123`. The loader uses
+`CLICKHOUSE_S3_ENDPOINT=http://minio:9000` so the ClickHouse container can reach
+MinIO over the Compose network.
 
 The default state locations are `.dlt/` for dlt's durable pipeline state and
 `state/control.sqlite` for operator controls. Keep both on persistent storage
@@ -62,6 +75,10 @@ to expose the latest row per object ID after replayed loads.
 ```sql
 SELECT * FROM default.v_hubspot_deal_pipeline LIMIT 20;
 ```
+
+Stop the services with `docker compose down`. Persistent MinIO and ClickHouse
+data remain in named Docker volumes; `docker compose down -v` also removes that
+data.
 
 The local test suite includes a synthetic extraction that is force-killed with
 `SIGKILL`, restarted from the same dlt state directory, and checked for exactly

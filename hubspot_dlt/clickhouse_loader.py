@@ -32,7 +32,10 @@ def _literal(value: str) -> str:
 
 def _config() -> dict[str, str]:
     return {
-        "endpoint": os.getenv("MINIO_ENDPOINT", "http://localhost:9000").rstrip("/"),
+        "endpoint": os.getenv(
+            "CLICKHOUSE_S3_ENDPOINT",
+            os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+        ).rstrip("/"),
         "bucket": os.getenv("MINIO_BUCKET", "hubspot"),
         "prefix": os.getenv("MINIO_PREFIX", "hubspot").strip("/"),
         "access_key": os.getenv("MINIO_ACCESS_KEY", ""),
