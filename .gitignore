@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+.dlt/
+state/*.sqlite
+state/*.sqlite-*

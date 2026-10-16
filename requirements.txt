@@ -1,0 +1,4 @@
+dlt[filesystem,parquet]>=1.15,<2
+requests>=2.31,<3
+urllib3>=1.26,<3
+clickhouse-connect>=0.8,<1

@@ -1,0 +1,1 @@
+"""HubSpot ingestion pipeline backed by dlt, MinIO, and ClickHouse."""
